@@ -1,6 +1,6 @@
 # Algorithm Trading MACD Optimization
 
-이 프로젝트는 사용자 정의 가중 이동평균(Custom Weighted Moving Average)을 활용하여 MACD 지표를 최적화하고, KOSPI200 및 주요 종목(삼성전자, SK하이닉스)에 대한 백테스트를 수행하는 알고리즘 트레이딩 도구입니다.
+이 프로젝트는 **사용자 정의 가중 이동평균(Custom Weighted Moving Average)**을 활용하여 MACD 지표를 최적화하고, KOSPI200 및 주요 종목(삼성전자, SK하이닉스)에 대한 백테스트를 수행하는 알고리즘 트레이딩 도구입니다.
 
 ## 📌 주요 기능
 * **Grid Search 최적화**: 2015~2019년 데이터를 바탕으로 최적의 Alpha, Fast/Slow 기간, Signal 기간을 탐색합니다.
