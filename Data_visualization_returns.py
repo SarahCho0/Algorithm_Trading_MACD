@@ -6,21 +6,30 @@ import FinanceDataReader as fdr
 from strategy_core import calc_ma_recursive, calculate_performance
 
 # ==========================================
-# 0. 사용자 설정
+# 0. 분석 대상 리스트 (여기에 종목 추가)
 # ==========================================
-TICKER = 'ks200'
-T_NAME = "KOSPI 200"
-TEST_START = "2020-01-01"
-TEST_END   = "2025-12-31"
-
-# 최적화 결과값 (히트맵이나 Train에서 찾은 값)
-B_FAST, B_SLOW, B_SIG, B_ALPHA = 20, 40, 5, 0.35 
+analysis_targets = [
+    {
+        'symbol': 'ks200',
+        'name': 'KOSPI 200',
+        'test_start': "2020-01-01",
+        'test_end': "2025-12-31",
+        'b_fast': 20, 'b_slow': 40, 'b_sig': 5, 'b_alpha': 0.35 
+    },
+    {
+        'symbol': '000660',
+        'name': 'SK HYNIX',
+        'test_start': "2020-01-01",
+        'test_end': "2025-12-31",
+        'b_fast': 20, 'b_slow': 50, 'b_sig': 11, 'b_alpha': 0.8
+    }
+]
 
 def plot_cum_return_compare_test(test_buy_hold, std_curve, oos_curve, std_ret, oos_ret, 
                                  b_fast, b_slow, b_sig, b_alpha, 
                                  title_prefix="[TEST]", savepath=None, show=True):
     
-    # 1. 인덱스 정렬 (FFILL로 빈틈 없이 메꿈)
+    # 1. 인덱스 정렬
     bh = test_buy_hold.ffill()
     st = std_curve.ffill()
     op = oos_curve.ffill()
@@ -53,54 +62,61 @@ def plot_cum_return_compare_test(test_buy_hold, std_curve, oos_curve, std_ret, o
     plt.close()
 
 # ==========================================
-# 실행 부분: 이중 shift 문제를 해결한 정밀 계산
+# 실행 부분: 주신 로직 그대로 루프화
 # ==========================================
 if __name__ == "__main__":
-    print(f"🚀 [{TICKER}] 수익률 정밀 분석 시작...")
-    
-    # 1. 데이터 로드 (시작점을 2015년으로 설정하여 MA 초기값 일치)
-    df_all = fdr.DataReader(TICKER, "2015-01-01", TEST_END)
-    
-    # 2. 지표 전구간 계산
-    # 표준
-    std_m = df_all['Close'].ewm(span=12, adjust=False).mean() - df_all['Close'].ewm(span=26, adjust=False).mean()
-    std_s = std_m.ewm(span=9, adjust=False).mean()
-    # 최적
-    opt_m = calc_ma_recursive(df_all['Close'], B_FAST, B_ALPHA) - calc_ma_recursive(df_all['Close'], B_SLOW, B_ALPHA)
-    opt_s = calc_ma_recursive(opt_m, B_SIG, B_ALPHA)
+    for target in analysis_targets:
+        TICKER = target['symbol']
+        T_NAME = target['name']
+        TEST_START = target['test_start']
+        TEST_END = target['test_end']
+        B_FAST, B_SLOW, B_SIG, B_ALPHA = target['b_fast'], target['b_slow'], target['b_sig'], target['b_alpha']
 
-    # 3. [중요] 테스트 구간 데이터만 추출
-    # calculate_performance 내부에서 shift(1)을 하므로, 여기서 미리 shift 하면 안 됨!
-    test_df = df_all.loc[TEST_START:TEST_END].copy()
-    if 'Change' not in test_df.columns:
-        test_df['Change'] = test_df['Close'].pct_change()
+        print(f"🚀 [{TICKER}] 수익률 정밀 분석 시작...")
+        
+        # 1. 데이터 로드 (시작점 일치)
+        df_all = fdr.DataReader(TICKER, "2015-01-01", TEST_END)
+        
+        # 2. 지표 전구간 계산
+        # 표준
+        std_m = df_all['Close'].ewm(span=12, adjust=False).mean() - df_all['Close'].ewm(span=26, adjust=False).mean()
+        std_s = std_m.ewm(span=9, adjust=False).mean()
+        # 최적
+        opt_m = calc_ma_recursive(df_all['Close'], B_FAST, B_ALPHA) - calc_ma_recursive(df_all['Close'], B_SLOW, B_ALPHA)
+        opt_s = calc_ma_recursive(opt_m, B_SIG, B_ALPHA)
 
-    # 4. 성능 계산 (strategy_core의 함수 사용)
-    # calculate_performance(수익률, MACD, Signal) 순서
-    std_ret_val, std_curve, _ = calculate_performance(
-        test_df['Change'], 
-        std_m.loc[test_df.index], 
-        std_s.loc[test_df.index]
-    )
-    
-    oos_ret_val, oos_curve, _ = calculate_performance(
-        test_df['Change'], 
-        opt_m.loc[test_df.index], 
-        opt_s.loc[test_df.index]
-    )
-    
-    # 시장 수익률 (Buy & Hold)
-    test_bh = (1 + test_df['Change'].fillna(0)).cumprod()
+        # 3. [중요] 테스트 구간 데이터만 추출 (주신 코드 로직 100% 유지)
+        test_df = df_all.loc[TEST_START:TEST_END].copy()
+        if 'Change' not in test_df.columns:
+            test_df['Change'] = test_df['Close'].pct_change()
 
-    # 5. 시각화 호출
-    plot_cum_return_compare_test(
-        test_buy_hold=test_bh,
-        std_curve=std_curve,
-        oos_curve=oos_curve,
-        std_ret=std_ret_val,
-        oos_ret=oos_ret_val,
-        b_fast=B_FAST, b_slow=B_SLOW, b_sig=B_SIG, b_alpha=B_ALPHA,
-        title_prefix=f"[{T_NAME}] {TEST_START}~{TEST_END}",
-        savepath="KOSPI_cumulative_return_compare_TEST",
-        show=True
-    )
+        # 4. 성능 계산
+        std_ret_val, std_curve, _ = calculate_performance(
+            test_df['Change'], 
+            std_m.loc[test_df.index], 
+            std_s.loc[test_df.index]
+        )
+        
+        oos_ret_val, oos_curve, _ = calculate_performance(
+            test_df['Change'], 
+            opt_m.loc[test_df.index], 
+            opt_s.loc[test_df.index]
+        )
+        
+        # 시장 수익률 (Buy & Hold)
+        test_bh = (1 + test_df['Change'].fillna(0)).cumprod()
+
+        # 5. 시각화 호출 (파일명에 종목명 반영)
+        plot_cum_return_compare_test(
+            test_buy_hold=test_bh,
+            std_curve=std_curve,
+            oos_curve=oos_curve,
+            std_ret=std_ret_val,
+            oos_ret=oos_ret_val,
+            b_fast=B_FAST, b_slow=B_SLOW, b_sig=B_SIG, b_alpha=B_ALPHA,
+            title_prefix=f"[{T_NAME}] {TEST_START}~{TEST_END}",
+            savepath=f"Returns_{T_NAME.replace(' ', '_')}_TEST",
+            show=True
+        )
+
+    print("\n✅ 모든 종목의 분석이 완료되었습니다.")
