@@ -25,7 +25,7 @@
     ```bash
     python Kospi200_custom.py
     # 또는 Sk_hynix.py / Data_visualization_custom.py /
-    #     Data_visualization_MACD.py /   실행
+    #     Data_visualization_MACD.py / Data_visualization_custom.py  실행
     ```
 
 ## 📊 분석 결과 
