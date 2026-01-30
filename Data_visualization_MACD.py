@@ -12,12 +12,14 @@ analysis_targets = [
     {
         'symbol': 'KS200', 
         'name': 'KOSPI 200',
-        'params': {'fast': 12, 'slow': 26, 'signal': 9, 'alpha': 0.9}
+        # 표준 MACD 방식에 맞춰 alpha 파라미터 제거
+        'params': {'fast': 12, 'slow': 26, 'signal': 9}
     },
     {
         'symbol': '000660', 
         'name': 'SK HYNIX',
-        'params': {'fast': 12, 'slow': 26, 'signal': 9, 'alpha': 0.9}
+        # 표준 MACD 방식에 맞춰 alpha 파라미터 제거
+        'params': {'fast': 12, 'slow': 26, 'signal': 9}
     }
 ]
 
@@ -26,14 +28,16 @@ TEST_START = '2020-01-01'
 END_DATE = '2025-12-31'
 
 # 결과 저장을 위한 폴더 생성
-save_dir = "backtest_results_기존MACD"
+save_dir = "backtest_results_표준MACD"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-def calc_custom_ma(series, n, alpha):
-    weights = np.array([alpha**i for i in range(n)])
-    normalized_weights = (weights / weights.sum())[::-1]
-    return series.rolling(window=n).apply(lambda x: np.dot(x, normalized_weights), raw=True)
+def calc_custom_ma(series, n):
+    """
+    표준 EMA(지수이동평균) 계산 방식 적용
+    alpha = 2 / (n + 1)
+    """
+    return series.ewm(span=n, adjust=False).mean()
 
 # ==========================================
 # 2. 분석 실행 및 시각화 루프
@@ -47,10 +51,11 @@ for target in analysis_targets:
     if 'Change' not in df.columns:
         df['Change'] = df['Close'].pct_change()
 
-    df['MA_Fast'] = calc_custom_ma(df['Close'], p['fast'], p['alpha'])
-    df['MA_Slow'] = calc_custom_ma(df['Close'], p['slow'], p['alpha'])
+    # 파라미터에서 alpha를 사용하지 않고 n값만 전달
+    df['MA_Fast'] = calc_custom_ma(df['Close'], p['fast'])
+    df['MA_Slow'] = calc_custom_ma(df['Close'], p['slow'])
     df['MACD'] = df['MA_Fast'] - df['MA_Slow']
-    df['Signal'] = calc_custom_ma(df['MACD'], p['signal'], p['alpha'])
+    df['Signal'] = calc_custom_ma(df['MACD'], p['signal'])
     df['Hist'] = df['MACD'] - df['Signal']
 
     df['Position'] = np.where(df['MACD'] > df['Signal'], 1, 0)
@@ -94,7 +99,7 @@ for target in analysis_targets:
     ax_vol.grid(True, alpha=0.2)
 
     ax2 = fig.add_subplot(gs[2])
-    ax2.plot(test_df.index, test_df['Cum_Strategy'], label='Optimized Strategy', color='royalblue', linewidth=2.5)
+    ax2.plot(test_df.index, test_df['Cum_Strategy'], label='Standard Strategy', color='royalblue', linewidth=2.5)
     ax2.plot(test_df.index, test_df['Cum_BH'], label='Market (Buy & Hold)', color='gray', linestyle='--', alpha=0.7)
     ax2.fill_between(test_df.index, 1, test_df['Cum_Strategy'], where=(test_df['Cum_Strategy'] >= 1), color='royalblue', alpha=0.1)
     ax2.set_title("Cumulative Returns Comparison", fontsize=13)
@@ -117,10 +122,11 @@ for target in analysis_targets:
     for i, s in enumerate(s_range):
         for j, f in enumerate(f_range):
             if f < s:
-                m_f = calc_custom_ma(test_df['Close'], f, p['alpha'])
-                m_s = calc_custom_ma(test_df['Close'], s, p['alpha'])
+                # 감도 분석에서도 표준 EMA 방식 적용
+                m_f = calc_custom_ma(test_df['Close'], f)
+                m_s = calc_custom_ma(test_df['Close'], s)
                 m_macd = m_f - m_s
-                m_sig = calc_custom_ma(m_macd, p['signal'], p['alpha'])
+                m_sig = calc_custom_ma(m_macd, p['signal'])
                 m_pos = np.where(m_macd > m_sig, 1, 0)
                 h_map[i, j] = (1 + pd.Series(m_pos).shift(1) * test_df['Change'].reset_index(drop=True)).cumprod().iloc[-1] - 1
     sns.heatmap(h_map, annot=True, fmt=".1%", xticklabels=f_range, yticklabels=s_range, cmap='RdYlGn', ax=ax4)
@@ -128,7 +134,7 @@ for target in analysis_targets:
     
     plt.tight_layout()
     # --- 그래프 파일 저장 ---
-    plot_filename = os.path.join(save_dir, f"{name.replace(' ', '_')}_Analysis_Origin_MACD.pdf")
+    plot_filename = os.path.join(save_dir, f"{name.replace(' ', '_')}_Analysis_Standard_MACD.pdf")
     plt.savefig(plot_filename)
     plt.show()
 
@@ -148,7 +154,7 @@ for target in analysis_targets:
         f"3. 최대 낙폭 (MDD): {max_mdd*100:.2f}%\n"
         f"4. 승률 (보유일 기준): {win_rate:.2f}%\n"
         f"5. 매매 횟수: {trade_count}회\n"
-        f"6. 설정 파라미터: Fast={p['fast']}, Slow={p['slow']}, Signal={p['signal']}, Alpha={p['alpha']}\n"
+        f"6. 설정 파라미터: Fast={p['fast']}, Slow={p['slow']}, Signal={p['signal']} (Standard EMA Alpha)\n"
         f"{'='*70}\n"
     )
 
