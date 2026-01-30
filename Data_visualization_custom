@@ -12,12 +12,12 @@ analysis_targets = [
     {
         'symbol': 'KS200', 
         'name': 'KOSPI 200',
-        'params': {'fast': 20, 'slow': 40, 'signal': 5, 'alpha': 0.9}
+        'params': {'fast': 20, 'slow': 40, 'signal': 5, 'alpha': 0.35}
     },
     {
         'symbol': '000660', 
         'name': 'SK HYNIX',
-        'params': {'fast': 20, 'slow': 40, 'signal': 5, 'alpha': 0.9}
+        'params': {'fast': 20, 'slow': 50, 'signal': 11, 'alpha': 0.8}
     }
 ]
 
