@@ -81,18 +81,16 @@ def calculate_performance(change_series, macd_series, signal_series):
 # ==========================================
 # 2. 데이터 준비 및 기간 분리
 # ==========================================
-TICKER = '000660' # (삼성전자:'005930', KOSPI200:'KS200', SK하이닉스:'000660')
+TICKER = '000660' #005930, ks200
 START_DATE = '2015-01-01'
 END_DATE = '2025-12-31'
 
-print(f"[{TICKER}] 데이터 로딩 중...")
+print(f"[{TICKER}] 데이터 로딩")
 df_all = fdr.DataReader(TICKER, START_DATE, END_DATE)
 
-# 등락률 계산 (Close 기준)
 if 'Change' not in df_all.columns:
     df_all['Change'] = df_all['Close'].pct_change()
 
-# 기간 분리
 train_df = df_all.loc['2015-01-01':'2019-12-31'].copy()
 test_df = df_all.loc['2020-01-01':'2025-12-31'].copy()
 
@@ -100,9 +98,8 @@ print(f"Train 기간: {train_df.index[0].date()} ~ {train_df.index[-1].date()}")
 print(f"Test  기간: {test_df.index[0].date()} ~ {test_df.index[-1].date()}")
 
 # ==========================================
-# 3. [Train] 파라미터 최적화 (Grid Search)
+# 3. [Train] 파라미터 최적화
 # ==========================================
-print(f"\n🚀 [Step 1] 훈련 데이터(Train) 최적화 시작...")
 
 FAST_RANGE = range(5, 25, 5)
 SLOW_RANGE = range(20, 60, 10)

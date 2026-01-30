@@ -12,12 +12,12 @@ analysis_targets = [
     {
         'symbol': 'KS200', 
         'name': 'KOSPI 200',
-        'params': {'fast': 12, 'slow': 26, 'signal': 9, 'alpha': 0.9}
+        'params': {'fast': 20, 'slow': 40, 'signal': 5, 'alpha': 0.35}
     },
     {
         'symbol': '000660', 
         'name': 'SK HYNIX',
-        'params': {'fast': 12, 'slow': 26, 'signal': 9, 'alpha': 0.9}
+        'params': {'fast': 20, 'slow': 50, 'signal': 11, 'alpha': 0.8}
     }
 ]
 
@@ -26,14 +26,50 @@ TEST_START = '2020-01-01'
 END_DATE = '2025-12-31'
 
 # 결과 저장을 위한 폴더 생성
-save_dir = "backtest_results_기존MACD"
+save_dir = "Datavisualization_results"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
 def calc_custom_ma(series, n, alpha):
+    """
+    1번 분석 코드의 재귀적(Recursive) 방식을 시각화 코드에 적용
+    """
+    data = series.values
+    length = len(data)
+    result = np.full(length, np.nan)
+
+    valid_mask = np.isfinite(data)
+    if not np.any(valid_mask):
+        return pd.Series(result, index=series.index)
+
+    first_valid_idx = np.argmax(valid_mask)
+
+    if length < first_valid_idx + n:
+        return pd.Series(result, index=series.index)
+
+    k_factor = (1 - alpha) / (1 - alpha**n)
+    alpha_n = alpha**n
+
+    initial_window = data[first_valid_idx : first_valid_idx + n]
     weights = np.array([alpha**i for i in range(n)])
-    normalized_weights = (weights / weights.sum())[::-1]
-    return series.rolling(window=n).apply(lambda x: np.dot(x, normalized_weights), raw=True)
+    w_sum = weights.sum()
+    normalized_weights = (weights / w_sum)[::-1]
+
+    start_idx = first_valid_idx + n - 1
+    result[start_idx] = np.dot(initial_window, normalized_weights)
+
+    for t in range(start_idx + 1, length):
+        prev_s = result[t-1]
+        curr_x = data[t]
+        old_x = data[t-n]
+
+        if np.isnan(curr_x) or np.isnan(old_x):
+            result[t] = np.nan
+            continue
+
+        result[t] = alpha * prev_s + k_factor * (curr_x - alpha_n * old_x)
+
+    return pd.Series(result, index=series.index)
 
 # ==========================================
 # 2. 분석 실행 및 시각화 루프
@@ -128,7 +164,7 @@ for target in analysis_targets:
     
     plt.tight_layout()
     # --- 그래프 파일 저장 ---
-    plot_filename = os.path.join(save_dir, f"{name.replace(' ', '_')}_Analysis_Origin_MACD.pdf")
+    plot_filename = os.path.join(save_dir, f"{name.replace(' ', '_')}_Analysis.pdf")
     plt.savefig(plot_filename)
     plt.show()
 
